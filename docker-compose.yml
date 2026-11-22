@@ -1,0 +1,41 @@
+name: webvm
+
+services:
+  webvm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: webvm:alpine-php-apache
+    container_name: ${WEBVM_CONTAINER_NAME:-webvm}
+    hostname: ${WEBVM_HOSTNAME:-webvm}
+    restart: unless-stopped
+    stop_grace_period: 5s
+
+    # Bound to 0.0.0.0 by default. Set WEBVM_BIND_ADDR=127.0.0.1 in .env
+    # to restrict access to localhost only.
+    ports:
+      - "${WEBVM_BIND_ADDR:-0.0.0.0}:${WEBVM_HTTP_PORT:-8081}:80"
+      - "${WEBVM_BIND_ADDR:-0.0.0.0}:${WEBVM_ADMIN_PORT:-8082}:8082"
+      - "${WEBVM_BIND_ADDR:-0.0.0.0}:${WEBVM_TERMINAL_PORT:-7681}:7681"
+
+    environment:
+      WEBVM_TERMINAL_PORT: "${WEBVM_TERMINAL_PORT:-7681}"
+      WEBVM_LISTEN_PORT: "7681"
+      WEBVM_HTTP_PORT: "${WEBVM_HTTP_PORT:-8081}"
+      WEBVM_USER: "${WEBVM_USER:-admin}"
+      WEBVM_PASSWORD: "${WEBVM_PASSWORD:-}"
+      WEBVM_MAX_SESSIONS: "${WEBVM_MAX_SESSIONS:-8}"
+      WEBVM_SHELL: "${WEBVM_SHELL:-/bin/bash}"
+      WEBVM_CWD: "/var/www/localhost/htdocs"
+      TZ: "${TZ:-UTC}"
+
+    volumes:
+      # Live-edit the PHP site from the host. Changes appear on refresh.
+      - ./site:/var/www/localhost/htdocs:rw
+
+      # Keep Go's module cache and `go install` binaries across rebuilds.
+      - go-path:/root/go
+
+volumes:
+  go-path:
+

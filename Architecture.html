@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZunoX v2.1.0 — Architecture &amp; System Design</title>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+</script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:#0f172a; color:#f8fafc; margin:0; padding:32px; line-height:1.6; }
+  h1, h2 { color:#f8fafc; }
+  .subtitle { color:#94a3b8; margin-bottom:28px; }
+  .card { background:#1e293b; border:1px solid #334155; border-radius:12px; padding:24px; margin-bottom:24px; }
+  .mermaid { background:#0f172a; border-radius:8px; padding:16px; overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; margin-top:12px; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid #334155; font-size:0.92rem; }
+  th { color:#94a3b8; text-transform:uppercase; font-size:0.78rem; }
+  footer { color:#64748b; font-size:0.85rem; margin-top:32px; }
+</style>
+</head>
+<body>
+  <h1>ZunoX v2.1.0 &mdash; Architectural Layers &amp; System Design</h1>
+  <p class="subtitle">Multi-Tenant Containerized Development &amp; Terminal Platform</p>
+
+  <div class="card">
+    <h2>1. Layered System Architecture</h2>
+    <div class="mermaid">
+flowchart TD
+    subgraph L1["1. Client / Browser Layer"]
+        B1["Admin Browser (:8082/admin.php)"]
+        B2["Tenant Web Browser (:8081)"]
+        B3["Tenant xterm.js Terminal (:7681)"]
+    end
+
+    subgraph L2["2. Ingress &amp; Isolation Layer"]
+        A8082["Apache VirtualHost :8082 (Admin Only)"]
+        A80["Apache VirtualHost :80 (admin.php Denied + Tenant VHosts)"]
+        N7681["Node.js HTTP/WS Server :7681 (Cookie/Basic Auth)"]
+    end
+
+    subgraph L3["3. Process Supervision Layer"]
+        SUP["supervisord (tini PID 1)"]
+    end
+
+    subgraph L4["4. Runtime &amp; Toolchains Layer (Alpine 3.20)"]
+        PHP["PHP 8.3 (mod_php)"]
+        PTY["node-pty + /bin/bash"]
+        TOOLS["Python 3.12 · Go 1.22 · C/C++ · R 4.4 · Node 20 · SQLite 3"]
+    end
+
+    subgraph L5["5. Persistence &amp; Tenant Isolation Layer"]
+        DB["/etc/webvm/tenants.db (SQLite)"]
+        CONF["/etc/webvm/tenants/&lt;name&gt;.conf &amp; .log"]
+        WWW["/var/www/tenants/&lt;name&gt;/ (Isolated DocumentRoot &amp; CWD)"]
+    end
+
+    B1 --> A8082
+    B2 --> A80
+    B3 --> N7681
+    SUP --> A8082
+    SUP --> A80
+    SUP --> N7681
+    A8082 --> PHP
+    A80 --> PHP
+    N7681 --> PTY
+    PTY --> TOOLS
+    PHP --> DB
+    PHP --> CONF
+    PHP --> WWW
+    N7681 --> CONF
+    N7681 --> WWW
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Port &amp; Isolation Matrix</h2>
+    <table>
+      <thead>
+        <tr><th>Port</th><th>Service</th><th>Access &amp; Isolation</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>8082</code></td><td>Apache + PHP (<code>admin.php</code>)</td><td>Isolated Admin Dashboard; protected by PHP session login (<code>adminman</code>).</td></tr>
+        <tr><td><code>8081</code> (&rarr; 80)</td><td>Apache + PHP (Tenant Sites)</td><td><code>admin.php</code> blocked (<code>403</code>); per-tenant VirtualHosts serve <code>/var/www/tenants/&lt;name&gt;</code>.</td></tr>
+        <tr><td><code>7681</code></td><td>Node.js + <code>ws</code> + <code>node-pty</code></td><td>Tenant login screen + session cookie; spawns shell in <code>/var/www/tenants/&lt;name&gt;</code> with <code>root@&lt;name&gt;/webvm</code> prompt.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>&copy; 2026 ZunoX. All rights reserved.</footer>
+</body>
+</html>

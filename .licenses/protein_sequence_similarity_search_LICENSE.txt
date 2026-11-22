@@ -1,0 +1,6 @@
+Protein Sequence Similarity Search - Terms of Use Notification
+Timestamp (UTC): 2026-11-22T04:54:00Z
+
+The user was notified to review the terms of service for the external sequence similarity search services used by this skill:
+- EBI NCBI BLAST: https://www.ebi.ac.uk/jdispatcher/sss/ncbiblast
+- ColabFold (MMseqs2 API): https://colabfold.com

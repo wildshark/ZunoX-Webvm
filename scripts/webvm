@@ -1,0 +1,107 @@
+#!/bin/sh
+set -eu
+
+php_bin() {
+  if command -v php83 >/dev/null 2>&1; then
+    echo php83
+  else
+    echo php
+  fi
+}
+
+webvm_pid() {
+  hostname 2>/dev/null || echo webvm
+}
+
+case "${1:-help}" in
+  info)
+    PHP="$(php_bin)"
+    echo "WebVM"
+    echo "  hostname : $(webvm_pid)"
+    echo "  alpine   : $(cat /etc/alpine-release 2>/dev/null || echo unknown)"
+    echo "  kernel   : $(uname -r)"
+    echo "  php      : $("$PHP" -r 'echo PHP_VERSION;' 2>/dev/null || echo missing)"
+    echo "  apache   : $(httpd -v 2>/dev/null | sed -n 's/^Server version: //p')"
+    echo "  python   : $(command -v python3 >/dev/null 2>&1 && python3 --version 2>/dev/null | awk '{print $2}' || echo missing)"
+    echo "  go       : $(command -v go >/dev/null 2>&1 && go version 2>/dev/null | awk '{print $3}' | sed 's/^go//' || echo missing)"
+    echo "  c++      : $(command -v g++ >/dev/null 2>&1 && g++ -dumpversion 2>/dev/null || echo missing)"
+    echo "  r        : $(command -v R >/dev/null 2>&1 && R --version 2>/dev/null | head -n 1 | cut -d' ' -f3 || echo missing)"
+    echo "  node     : $(command -v node >/dev/null 2>&1 && node -v 2>/dev/null | sed 's/^v//' || echo missing)"
+    echo "  sqlite   : $(command -v sqlite3 >/dev/null 2>&1 && sqlite3 --version 2>/dev/null | awk '{print $1}' || echo missing)"
+    echo "  shell    : ${SHELL:-/bin/bash}"
+    if [ -n "${WEBVM_PASSWORD:-}" ]; then
+      echo "  auth     : HTTP basic auth enabled"
+    else
+      echo "  auth     : disabled"
+    fi
+    echo
+    echo "  site     : http://localhost:${WEBVM_HTTP_PORT:-8080}/"
+    if [ -z "${TENANT_ENV:-}" ]; then
+      echo "  admin    : http://localhost:${WEBVM_ADMIN_PORT:-8082}/admin.php"
+    fi
+    echo "  terminal : http://localhost:${WEBVM_TERMINAL_PORT:-7681}/"
+    echo
+    echo "  Web root : /var/www/localhost/htdocs"
+    ;;
+  site)
+    echo "http://localhost:${WEBVM_HTTP_PORT:-8080}/"
+    ;;
+  admin)
+    if [ -n "${TENANT_ENV:-}" ]; then
+      echo "Access denied: admin URL is only available to administrators." >&2
+      exit 1
+    fi
+    echo "http://localhost:${WEBVM_ADMIN_PORT:-8082}/admin.php"
+    ;;
+  terminal)
+    echo "http://localhost:${WEBVM_TERMINAL_PORT:-7681}/"
+    ;;
+  tools)
+    echo "Toolchains available in this container"
+    echo
+    echo "  python3 : $(command -v python3 >/dev/null 2>&1 && python3 --version 2>/dev/null | awk '{print $2}' || echo missing)   (pip: python3 -m pip, or use a venv)"
+    echo "  go      : $(command -v go >/dev/null 2>&1 && go version 2>/dev/null | awk '{print $3}' | sed 's/^go//' || echo missing)   (GOPATH /root/go)"
+    echo "  gcc/g++ : $(command -v g++ >/dev/null 2>&1 && g++ -dumpversion 2>/dev/null || echo missing)   (make, musl-dev included)"
+    echo "  R       : $(command -v R >/dev/null 2>&1 && R --version 2>/dev/null | head -n 1 | cut -d' ' -f3 || echo missing)   (Rscript: Rscript script.R)"
+    echo "  node    : $(command -v node >/dev/null 2>&1 && node -v 2>/dev/null | sed 's/^v//' || echo missing)   (npm: npm init -y, node app.js)"
+    echo "  sqlite3 : $(command -v sqlite3 >/dev/null 2>&1 && sqlite3 --version 2>/dev/null | awk '{print $1}' || echo missing)   (PHP: pdo_sqlite + sqlite3)"
+    echo
+    echo "Examples"
+    echo "  python3 -m venv .venv && . .venv/bin/activate"
+    echo "  go run ."
+    echo "  g++ -O2 -Wall -o app app.cpp && ./app"
+    echo "  sqlite3 /var/www/localhost/htdocs/data.db"
+    ;;
+  restart-apache)
+    supervisorctl restart apache
+    ;;
+  logs)
+    supervisorctl tail -f apache stderr
+    ;;
+  status)
+    supervisorctl status
+    ;;
+  help | --help | -h | *)
+    cat <<'EOF'
+WebVM helper commands
+
+  webvm info             Show the container and service details
+  webvm site             Print the PHP site URL
+  webvm admin            Print the Admin Dashboard URL
+  webvm terminal         Print the terminal URL
+  webvm status           Show Apache and terminal process status
+  webvm tools            Show Python, Go, C/C++, R and SQLite versions
+  webvm restart-apache   Restart Apache via supervisor
+  webvm logs             Follow the Apache error log
+
+Everything else is a normal Alpine Linux shell, for example:
+  apk add --no-cache vim git
+  php -v
+  python3 --version
+  go run .
+  g++ -O2 -o app app.cpp && ./app
+  sqlite3 data.db
+  ls /var/www/localhost/htdocs
+EOF
+    ;;
+esac

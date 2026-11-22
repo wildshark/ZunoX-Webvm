@@ -1,0 +1,6 @@
+# Local overrides
+.env
+node_modules/
+site/.DS_Store
+**/.DS_Store
+*.zip
